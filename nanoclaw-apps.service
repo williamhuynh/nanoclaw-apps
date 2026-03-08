@@ -1,0 +1,18 @@
+[Unit]
+Description=NanoClaw Apps Platform
+After=network.target docker.service
+
+[Service]
+Type=simple
+ExecStart=/home/nanoclaw/.nvm/versions/node/v22.22.0/bin/node /home/nanoclaw/nanoclaw-apps/dist/index.js
+WorkingDirectory=/home/nanoclaw/nanoclaw-apps
+Restart=on-failure
+RestartSec=5
+Environment=NODE_ENV=production
+Environment=HOME=/home/nanoclaw
+Environment=PATH=/home/nanoclaw/.nvm/versions/node/v22.22.0/bin:/usr/local/bin:/usr/bin:/bin:/home/nanoclaw/.local/bin
+StandardOutput=append:/home/nanoclaw/nanoclaw-apps/logs/nanoclaw-apps.log
+StandardError=append:/home/nanoclaw/nanoclaw-apps/logs/nanoclaw-apps.error.log
+
+[Install]
+WantedBy=default.target
