@@ -2,6 +2,7 @@ import express from 'express';
 import fs from 'fs';
 import { initDatabase } from './db.js';
 import { createRouter } from './api.js';
+import { startWatcher } from './watcher.js';
 
 const app = express();
 const PORT = 4000;
@@ -17,4 +18,5 @@ app.use('/api', createRouter(db));
 
 app.listen(PORT, () => {
   console.log(`nanoclaw-apps listening on :${PORT}`);
+  startWatcher(db, '/home/nanoclaw/apps');
 });
