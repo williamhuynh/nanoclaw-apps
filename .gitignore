@@ -1,3 +1,7 @@
 node_modules/
 dist/
 *.db
+logs/
+data/*.db-shm
+data/*.db-wal
+.claude/
