@@ -19,8 +19,18 @@ export async function startApp(app: App): Promise<string> {
     name: `nanoclaw-app-${app.name}`,
     ExposedPorts: { [`${app.port}/tcp`]: {} },
     HostConfig: {
-      PortBindings: { [`${app.port}/tcp`]: [{ HostPort: String(app.port) }] },
+      // Publish on loopback only — apps are reached via MC's reverse proxy, not
+      // directly on the LAN (security review F-006).
+      PortBindings: { [`${app.port}/tcp`]: [{ HostIp: '127.0.0.1', HostPort: String(app.port) }] },
       RestartPolicy: { Name: 'unless-stopped' },
+      // De-privilege the build/run sandbox: drop all caps, forbid privilege
+      // escalation, and cap blast radius. ReadonlyRootfs is intentionally NOT
+      // set — the scaffold writes a sqlite DB and npm caches; enabling it would
+      // need a per-app tmpfs audit. See security review F-006.
+      CapDrop: ['ALL'],
+      SecurityOpt: ['no-new-privileges'],
+      Memory: 1024 * 1024 * 1024,
+      PidsLimit: 512,
     },
     Env: [`PORT=${app.port}`],
   });

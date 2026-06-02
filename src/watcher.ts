@@ -6,6 +6,15 @@ import * as lifecycle from './lifecycle.js';
 const DEBOUNCE_MS = 5000;
 const timers = new Map<string, NodeJS.Timeout>();
 
+// Repos that are writable by agent containers must NEVER be auto-rebuilt from a
+// raw file event — an agent could plant a Dockerfile/package.json and trigger a
+// host `docker build` from an attacker-controlled tree (security review F-005).
+// `mission-control` is mounted read-write into every agent container at
+// /workspace/mission-control AND is the only registered app, so its auto-rebuild
+// here is both dangerous and redundant: it has its own .deploy-trigger path
+// (mission-control-deploy.path -> deploy.sh). Denylisting it loses nothing.
+const NO_AUTO_REBUILD = new Set(['mission-control']);
+
 export function startWatcher(database: Database, appsDir: string): void {
   const watcher = watch(appsDir, {
     ignoreInitial: true,
@@ -17,6 +26,7 @@ export function startWatcher(database: Database, appsDir: string): void {
     const relative = filePath.replace(appsDir + '/', '');
     const appName = relative.split('/')[0];
     if (!appName) return;
+    if (NO_AUTO_REBUILD.has(appName)) return;
 
     const app = db.getApp(database, appName);
     if (!app || app.status !== 'running') return;

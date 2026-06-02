@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import crypto from 'crypto';
 import type Database from 'better-sqlite3';
 import { createApp, getApp, listApps, updateAppStatus, deleteApp, getNextPort } from './db.js';
 import { buildApp, startApp, stopApp, getContainerLogs } from './lifecycle.js';
@@ -8,6 +9,30 @@ const NAME_RE = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 
 export function createRouter(db: Database.Database): Router {
   const router = Router();
+
+  // Shared-secret gate. This control plane drives `docker build`/`run` on the
+  // host (root-equivalent via the docker group), so every /api route requires
+  // APPS_API_KEY — a secret Mission Control's proxy and the host-side
+  // create-nanoclaw-app skill hold, but agent containers do NOT. Combined with
+  // the loopback bind, a prompt-injected agent cannot reach this surface even on
+  // 127.0.0.1. `/health` is registered outside this router and stays open for
+  // liveness checks. See security review F-004/F-024.
+  const APPS_API_KEY = process.env.APPS_API_KEY;
+  router.use((req, res, next) => {
+    if (!APPS_API_KEY) {
+      res.status(503).json({ error: 'APPS_API_KEY not configured' });
+      return;
+    }
+    const header = (req.headers.authorization as string | undefined) || '';
+    const token = header.toLowerCase().startsWith('bearer ') ? header.slice(7).trim() : '';
+    const a = Buffer.from(token);
+    const b = Buffer.from(APPS_API_KEY);
+    if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
+      res.status(401).json({ error: 'unauthorized' });
+      return;
+    }
+    next();
+  });
 
   // POST /apps — create a new app
   router.post('/apps', async (req, res) => {
